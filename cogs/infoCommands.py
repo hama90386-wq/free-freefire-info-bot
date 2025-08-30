@@ -156,11 +156,14 @@ class InfoCommands(commands.Cog):
 
             region = basic_info.get('region', 'Not found')
 
+            # Build Embed
             embed = discord.Embed(
-                title=" Player Information",
+                title="Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
+
+            # Profile image inside Embed
             embed.set_image(url=f"{self.profile_url}?uid={uid}")
 
             # ACCOUNT BASIC INFO
@@ -216,6 +219,7 @@ class InfoCommands(commands.Cog):
             embed.add_field(name="\u200b", value=pet_block, inline=False)
 
             # GUILD INFO
+            guild_info_lines = []
             if clan_info:
                 guild_info_lines = [
                     "**┌  GUILD INFO**",
@@ -233,32 +237,23 @@ class InfoCommands(commands.Cog):
                         f"    **├─ Last Login**: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
                         f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
                         f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
-                        f"    **├─ BR Rank**: {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    **└─ CS Rank**: {captain_info.get('csRankingPoints', 'Not found')}"
+                        f"    **├─ BR Rank**: {('' if captain_info.get('showBrRank') else 'Not found')} {captain_info.get('rankingPoints', 'Not found')}",
+                        f"    **└─ CS Rank**: {('' if captain_info.get('showCsRank') else 'Not found')} {captain_info.get('csRankingPoints', 'Not found')}"
                     ])
                 embed.add_field(name="\u200b", value="\n".join(guild_info_lines), inline=False)
 
             embed.set_footer(text="DEVELOPED BY THUG")
             await ctx.send(embed=embed)
 
-            # Send images
-            try:
-                outfit_url = f"{self.profile_url}?uid={uid}"
-                async with self.session.get(outfit_url) as img_file:
-                    if img_file.status == 200:
-                        with io.BytesIO(await img_file.read()) as buf:
-                            await ctx.send(file=discord.File(buf, filename=f"profile_{uuid.uuid4().hex[:8]}.png"))
-
-                card_url = f"{self.profile_card_url}?uid={uid}"
-                async with self.session.get(card_url) as img_file:
-                    if img_file.status == 200:
-                        with io.BytesIO(await img_file.read()) as buf:
-                            await ctx.send(file=discord.File(buf, filename=f"profile_card_{uuid.uuid4().hex[:8]}.png"))
-            except Exception as e:
-                print("Image sending failed:", e)
+            # إرسال Outfit كملف منفصل
+            outfit_url = f"{self.profile_url}?uid={uid}"
+            async with self.session.get(outfit_url) as img_file:
+                if img_file.status == 200:
+                    with io.BytesIO(await img_file.read()) as buf:
+                        await ctx.send(file=discord.File(buf, filename=f"outfit_{uuid.uuid4().hex[:8]}.png"))
 
         except Exception as e:
-            await ctx.send(f" Unexpected error: `{e}`")
+            await ctx.send(f"Unexpected error: `{e}`")
         finally:
             gc.collect()
 
