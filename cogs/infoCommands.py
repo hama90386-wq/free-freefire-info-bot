@@ -30,14 +30,7 @@ class InfoCommands(commands.Cog):
             return "Not found"
 
     def load_config(self):
-        default_config = {
-            "servers": {},
-            "global_settings": {
-                "default_all_channels": False,
-                "default_cooldown": 30,
-                "default_daily_limit": 30
-            }
-        }
+        default_config = {"servers": {}, "global_settings": {"default_all_channels": False, "default_cooldown": 30, "default_daily_limit": 30}}
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -69,6 +62,7 @@ class InfoCommands(commands.Cog):
         except Exception:
             return False
 
+    # Set/remove/list info channels commands
     @commands.hybrid_command(name="setinfochannel", description="Allow a channel for !info commands")
     @commands.has_permissions(administrator=True)
     async def set_info_channel(self, ctx: commands.Context, channel: discord.TextChannel):
@@ -99,28 +93,23 @@ class InfoCommands(commands.Cog):
     async def list_info_channels(self, ctx: commands.Context):
         guild_id = str(ctx.guild.id)
         if guild_id in self.config_data["servers"] and self.config_data["servers"][guild_id]["info_channels"]:
-            channels = []
-            for channel_id in self.config_data["servers"][guild_id]["info_channels"]:
-                ch = ctx.guild.get_channel(int(channel_id))
-                channels.append(f"• {ch.mention if ch else f'ID: {channel_id}'}")
-            embed = discord.Embed(title="Allowed channels for !info", description="\n".join(channels),
-                                  color=discord.Color.blue())
-            cooldown = self.config_data["servers"][guild_id].get("config", {}).get(
-                "cooldown", self.config_data["global_settings"]["default_cooldown"])
+            channels = [f"• {ctx.guild.get_channel(int(ch)).mention if ctx.guild.get_channel(int(ch)) else f'ID: {ch}'}"
+                        for ch in self.config_data["servers"][guild_id]["info_channels"]]
+            embed = discord.Embed(title="Allowed channels for !info", description="\n".join(channels), color=discord.Color.blue())
+            cooldown = self.config_data["servers"][guild_id].get("config", {}).get("cooldown", self.config_data["global_settings"]["default_cooldown"])
             embed.set_footer(text=f"Current cooldown: {cooldown} seconds")
         else:
-            embed = discord.Embed(title="Allowed channels for !info",
-                                  description="All channels are allowed (no restriction configured)",
-                                  color=discord.Color.blue())
+            embed = discord.Embed(title="Allowed channels for !info", description="All channels are allowed", color=discord.Color.blue())
         await ctx.send(embed=embed)
 
+    # Main player info command
     @commands.hybrid_command(name="info", description="Displays information about a Free Fire player")
     @app_commands.describe(uid="FREE FIRE INFO")
     async def player_info(self, ctx: commands.Context, uid: str):
         guild_id = str(ctx.guild.id)
 
         if not uid.isdigit() or len(uid) < 6:
-            return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
+            return await ctx.reply(" Invalid UID! Must be numbers and ≥6 digits", mention_author=False)
 
         if not await self.is_channel_allowed(ctx):
             return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
@@ -154,83 +143,78 @@ class InfoCommands(commands.Cog):
             profile_info = data.get('profileInfo', {}) or {}
             social_info = data.get('socialInfo', {}) or {}
 
-            # Embed
-            embed = discord.Embed(
-                title=" Player Information",
-                color=discord.Color.blurple(),
-                timestamp=datetime.now()
-            )
-            embed.set_image(url=f"{self.profile_url}?uid={uid}")  # profile image
+            embed = discord.Embed(title="Player Information", color=discord.Color.blurple(), timestamp=datetime.now())
 
-            # Basic info
+            # Profile image inside Embed
+            embed.set_image(url=f"{self.profile_url}?uid={uid}")
+
+            # Basic Info block
             created_at = self.convert_unix_timestamp(basic_info.get('createAt', 'Not found'))
             last_login = self.convert_unix_timestamp(basic_info.get('lastLoginAt', 'Not found'))
             basic_block = "\n".join([
-                "**┌  ACCOUNT BASIC INFO**",
-                f"**├─ Name**: {basic_info.get('nickname', 'Not found')}",
-                f"**├─ UID**: `{uid}`",
-                f"**├─ Level**: {basic_info.get('level', 'Not found')} (Exp: {basic_info.get('exp', '?')})",
-                f"**├─ Region**: {basic_info.get('region', 'Not found')}",
-                f"**├─ Likes**: {basic_info.get('liked', 'Not found')}",
-                f"**├─ Honor Score**: {credit_score_info.get('creditScore', 'Not found')}",
-                f"**└─ Signature**: {social_info.get('signature', 'None') or 'None'}"
+                "**┌ ACCOUNT BASIC INFO**",
+                f"**├ Name**: {basic_info.get('nickname', 'Not found')}",
+                f"**├ UID**: `{uid}`",
+                f"**├ Level**: {basic_info.get('level', 'Not found')} (Exp: {basic_info.get('exp', '?')})",
+                f"**├ Region**: {basic_info.get('region', 'Not found')}",
+                f"**├ Likes**: {basic_info.get('liked', 'Not found')}",
+                f"**├ Honor Score**: {credit_score_info.get('creditScore', 'Not found')}",
+                f"**└ Signature**: {social_info.get('signature', 'None') or 'None'}"
             ])
             embed.add_field(name="\u200b", value=basic_block, inline=False)
 
-            # Activity info
+            # Activity block
             br_rank = basic_info.get('rankingPoints', '?')
             cs_rank = basic_info.get('csRankingPoints', '?')
-            show_br = basic_info.get('showBrRank', False)
-            show_cs = basic_info.get('showCsRank', False)
             activity_block = "\n".join([
-                "**┌  ACCOUNT ACTIVITY**",
-                f"**├─ Most Recent OB**: {basic_info.get('releaseVersion', '?')}",
-                f"**├─ Current BP Badges**: {basic_info.get('badgeCnt', 'Not found')}",
-                f"**├─ BR Rank**: {('' if show_br else 'Not found')} {br_rank}",
-                f"**├─ CS Rank**: {('' if show_cs else 'Not found')} {cs_rank}",
-                f"**├─ Created At**: {created_at}",
-                f"**└─ Last Login**: {last_login}"
+                "**┌ ACCOUNT ACTIVITY**",
+                f"**├ Most Recent OB**: {basic_info.get('releaseVersion', '?')}",
+                f"**├ Current BP Badges**: {basic_info.get('badgeCnt', 'Not found')}",
+                f"**├ BR Rank**: {br_rank}",
+                f"**├ CS Rank**: {cs_rank}",
+                f"**├ Created At**: {created_at}",
+                f"**└ Last Login**: {last_login}"
             ])
             embed.add_field(name="\u200b", value=activity_block, inline=False)
 
-            # Guild info formatted exactly
+            # Guild info block
             if clan_info:
                 guild_lines = [
                     "**GUILD INFO**",
-                    f"├─ Guild Name: {clan_info.get('clanName', 'Not found')}",
-                    f"├─ Guild ID: {clan_info.get('clanId', 'Not found')}",
-                    f"├─ Guild Level: {clan_info.get('clanLevel', 'Not found')}",
-                    f"├─ Live Members: {clan_info.get('memberNum', 'Not found')}/{clan_info.get('capacity', '?')}",
-                    f"└─ Leader Info:"
+                    f"├ Guild Name: {clan_info.get('clanName', 'Not found')}",
+                    f"├ Guild ID: {clan_info.get('clanId', 'Not found')}",
+                    f"├ Guild Level: {clan_info.get('clanLevel', 'Not found')}",
+                    f"├ Live Members: {clan_info.get('memberNum', 'Not found')}/{clan_info.get('capacity', '?')}",
+                    f"└ Leader Info:"
                 ]
                 if captain_info:
                     guild_lines.extend([
-                        f"    ├─ Leader Name: {captain_info.get('nickname', 'Not found')}",
-                        f"    ├─ Leader UID: {captain_info.get('accountId', 'Not found')}",
-                        f"    ├─ Leader Level: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
-                        f"    ├─ Last Login: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
-                        f"    ├─ Title: {captain_info.get('title', 'Not found')}",
-                        f"    ├─ BP Badges: {captain_info.get('badgeCnt', '?')}",
-                        f"    ├─ BR Rank: {('' if captain_info.get('showBrRank') else 'Not found')} {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    └─ CS Rank: {('' if captain_info.get('showCsRank') else 'Not found')} {captain_info.get('csRankingPoints', 'Not found')}"
+                        f"    ├ Leader Name: {captain_info.get('nickname', 'Not found')}",
+                        f"    ├ Leader UID: {captain_info.get('accountId', 'Not found')}",
+                        f"    ├ Leader Level: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
+                        f"    ├ Last Login: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
+                        f"    ├ Title: {captain_info.get('title', 'Not found')}",
+                        f"    ├ BP Badges: {captain_info.get('badgeCnt', '?')}",
+                        f"    ├ BR Rank: {captain_info.get('rankingPoints', 'Not found')}",
+                        f"    └ CS Rank: {captain_info.get('csRankingPoints', 'Not found')}"
                     ])
                 embed.add_field(name="\u200b", value="\n".join(guild_lines), inline=False)
 
-            embed.set_footer(text="DEVELOPED BY THUG")
+            embed.set_footer(text="DEVELOPED BY Dark X Yin ")
             await ctx.send(embed=embed)
 
-            # Outfit image separately
+            # Outfit image sent separately
             try:
                 outfit_url = f"{self.profile_url}?uid={uid}"
                 async with self.session.get(outfit_url) as img_file:
                     if img_file.status == 200:
                         with io.BytesIO(await img_file.read()) as buf:
-                            await ctx.send(file=discord.File(buf, filename=f"profile_{uuid.uuid4().hex[:8]}.png"))
+                            await ctx.send(file=discord.File(buf, filename=f"profile_outfit_{uuid.uuid4().hex[:8]}.png"))
             except Exception as e:
                 print("Outfit image sending failed:", e)
 
         except Exception as e:
-            await ctx.send(f" Unexpected error: `{e}`")
+            await ctx.send(f"Unexpected error: `{e}`")
         finally:
             gc.collect()
 
