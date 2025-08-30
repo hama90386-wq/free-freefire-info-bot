@@ -15,7 +15,7 @@ CONFIG_FILE = "info_channels.json"
 class InfoCommands(commands.Cog):
     def __init__(self, bot: commands.Bot, session: aiohttp.ClientSession):
         self.bot = bot
-        self.session = session  # use bot.session (passed from main)
+        self.session = session
         self.api_url = "http://raw.thug4ff.com/info"
         self.profile_url = "https://genprofile-24nr.onrender.com/api/profile"
         self.profile_card_url = "https://genprofile-24nr.onrender.com/api/profile_card"
@@ -154,35 +154,30 @@ class InfoCommands(commands.Cog):
             profile_info = data.get('profileInfo', {}) or {}
             social_info = data.get('socialInfo', {}) or {}
 
-            region = basic_info.get('region', 'Not found')
-
-            # Build Embed
+            # Embed
             embed = discord.Embed(
-                title="Player Information",
+                title=" Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
+            embed.set_image(url=f"{self.profile_url}?uid={uid}")  # profile image
 
-            # Profile image inside Embed
-            embed.set_image(url=f"{self.profile_url}?uid={uid}")
-
-            # ACCOUNT BASIC INFO
+            # Basic info
             created_at = self.convert_unix_timestamp(basic_info.get('createAt', 'Not found'))
             last_login = self.convert_unix_timestamp(basic_info.get('lastLoginAt', 'Not found'))
-
             basic_block = "\n".join([
                 "**┌  ACCOUNT BASIC INFO**",
                 f"**├─ Name**: {basic_info.get('nickname', 'Not found')}",
                 f"**├─ UID**: `{uid}`",
                 f"**├─ Level**: {basic_info.get('level', 'Not found')} (Exp: {basic_info.get('exp', '?')})",
-                f"**├─ Region**: {region}",
+                f"**├─ Region**: {basic_info.get('region', 'Not found')}",
                 f"**├─ Likes**: {basic_info.get('liked', 'Not found')}",
                 f"**├─ Honor Score**: {credit_score_info.get('creditScore', 'Not found')}",
                 f"**└─ Signature**: {social_info.get('signature', 'None') or 'None'}"
             ])
             embed.add_field(name="\u200b", value=basic_block, inline=False)
 
-            # ACCOUNT ACTIVITY
+            # Activity info
             br_rank = basic_info.get('rankingPoints', '?')
             cs_rank = basic_info.get('csRankingPoints', '?')
             show_br = basic_info.get('showBrRank', False)
@@ -198,62 +193,44 @@ class InfoCommands(commands.Cog):
             ])
             embed.add_field(name="\u200b", value=activity_block, inline=False)
 
-            # ACCOUNT OVERVIEW
-            overview_block = "\n".join([
-                "**┌  ACCOUNT OVERVIEW**",
-                f"**├─ Avatar ID**: {profile_info.get('avatarId', 'Not found')}",
-                f"**├─ Banner ID**: {basic_info.get('bannerId', 'Not found')}",
-                f"**├─ Pin ID**: {captain_info.get('pinId', 'Not found') if captain_info else 'Default'}",
-                f"**└─ Equipped Skills**: {profile_info.get('equipedSkills', 'Not found')}"
-            ])
-            embed.add_field(name="\u200b", value=overview_block, inline=False)
-
-            # PET DETAILS
-            pet_block = "\n".join([
-                "**┌  PET DETAILS**",
-                f"**├─ Equipped?**: {'Yes' if pet_info.get('isSelected') else 'Not Found'}",
-                f"**├─ Pet Name**: {pet_info.get('name', 'Not Found')}",
-                f"**├─ Pet Exp**: {pet_info.get('exp', 'Not Found')}",
-                f"**└─ Pet Level**: {pet_info.get('level', 'Not Found')}"
-            ])
-            embed.add_field(name="\u200b", value=pet_block, inline=False)
-
-            # GUILD INFO
-            guild_info_lines = []
+            # Guild info formatted exactly
             if clan_info:
-                guild_info_lines = [
-                    "**┌  GUILD INFO**",
-                    f"**├─ Guild Name**: {clan_info.get('clanName', 'Not found')}",
-                    f"**├─ Guild ID**: `{clan_info.get('clanId', 'Not found')}`",
-                    f"**├─ Guild Level**: {clan_info.get('clanLevel', 'Not found')}",
-                    f"**├─ Live Members**: {clan_info.get('memberNum', 'Not found')}/{clan_info.get('capacity', '?')}"
+                guild_lines = [
+                    "**GUILD INFO**",
+                    f"├─ Guild Name: {clan_info.get('clanName', 'Not found')}",
+                    f"├─ Guild ID: {clan_info.get('clanId', 'Not found')}",
+                    f"├─ Guild Level: {clan_info.get('clanLevel', 'Not found')}",
+                    f"├─ Live Members: {clan_info.get('memberNum', 'Not found')}/{clan_info.get('capacity', '?')}",
+                    f"└─ Leader Info:"
                 ]
                 if captain_info:
-                    guild_info_lines.extend([
-                        "**└─ Leader Info**:",
-                        f"    **├─ Leader Name**: {captain_info.get('nickname', 'Not found')}",
-                        f"    **├─ Leader UID**: `{captain_info.get('accountId', 'Not found')}`",
-                        f"    **├─ Leader Level**: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
-                        f"    **├─ Last Login**: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
-                        f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
-                        f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
-                        f"    **├─ BR Rank**: {('' if captain_info.get('showBrRank') else 'Not found')} {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    **└─ CS Rank**: {('' if captain_info.get('showCsRank') else 'Not found')} {captain_info.get('csRankingPoints', 'Not found')}"
+                    guild_lines.extend([
+                        f"    ├─ Leader Name: {captain_info.get('nickname', 'Not found')}",
+                        f"    ├─ Leader UID: {captain_info.get('accountId', 'Not found')}",
+                        f"    ├─ Leader Level: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
+                        f"    ├─ Last Login: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
+                        f"    ├─ Title: {captain_info.get('title', 'Not found')}",
+                        f"    ├─ BP Badges: {captain_info.get('badgeCnt', '?')}",
+                        f"    ├─ BR Rank: {('' if captain_info.get('showBrRank') else 'Not found')} {captain_info.get('rankingPoints', 'Not found')}",
+                        f"    └─ CS Rank: {('' if captain_info.get('showCsRank') else 'Not found')} {captain_info.get('csRankingPoints', 'Not found')}"
                     ])
-                embed.add_field(name="\u200b", value="\n".join(guild_info_lines), inline=False)
+                embed.add_field(name="\u200b", value="\n".join(guild_lines), inline=False)
 
             embed.set_footer(text="DEVELOPED BY THUG")
             await ctx.send(embed=embed)
 
-            # إرسال Outfit كملف منفصل
-            outfit_url = f"{self.profile_url}?uid={uid}"
-            async with self.session.get(outfit_url) as img_file:
-                if img_file.status == 200:
-                    with io.BytesIO(await img_file.read()) as buf:
-                        await ctx.send(file=discord.File(buf, filename=f"outfit_{uuid.uuid4().hex[:8]}.png"))
+            # Outfit image separately
+            try:
+                outfit_url = f"{self.profile_url}?uid={uid}"
+                async with self.session.get(outfit_url) as img_file:
+                    if img_file.status == 200:
+                        with io.BytesIO(await img_file.read()) as buf:
+                            await ctx.send(file=discord.File(buf, filename=f"profile_{uuid.uuid4().hex[:8]}.png"))
+            except Exception as e:
+                print("Outfit image sending failed:", e)
 
         except Exception as e:
-            await ctx.send(f"Unexpected error: `{e}`")
+            await ctx.send(f" Unexpected error: `{e}`")
         finally:
             gc.collect()
 
