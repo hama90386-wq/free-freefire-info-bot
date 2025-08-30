@@ -23,7 +23,6 @@ class InfoCommands(commands.Cog):
         self.cooldowns = {}
 
     def convert_unix_timestamp(self, timestamp) -> str:
-        # safe conversion: accept int or numeric-string, otherwise return 'Not found'
         try:
             ts = int(timestamp)
             return datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -157,13 +156,12 @@ class InfoCommands(commands.Cog):
 
             region = basic_info.get('region', 'Not found')
 
-            # Build the large formatted embed (similar to your screenshot)
             embed = discord.Embed(
                 title=" Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
-            embed.set_thumbnail(url=ctx.author.display_avatar.url)
+            embed.set_image(url=f"{self.profile_url}?uid={uid}")
 
             # ACCOUNT BASIC INFO
             created_at = self.convert_unix_timestamp(basic_info.get('createAt', 'Not found'))
@@ -217,7 +215,7 @@ class InfoCommands(commands.Cog):
             ])
             embed.add_field(name="\u200b", value=pet_block, inline=False)
 
-            # GUILD INFO (if exists)
+            # GUILD INFO
             if clan_info:
                 guild_info_lines = [
                     "**┌  GUILD INFO**",
@@ -235,35 +233,27 @@ class InfoCommands(commands.Cog):
                         f"    **├─ Last Login**: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
                         f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
                         f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
-                        f"    **├─ BR Rank**: {('' if captain_info.get('showBrRank') else 'Not found')} {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    **└─ CS Rank**: {('' if captain_info.get('showCsRank') else 'Not found')} {captain_info.get('csRankingPoints', 'Not found')}"
+                        f"    **├─ BR Rank**: {captain_info.get('rankingPoints', 'Not found')}",
+                        f"    **└─ CS Rank**: {captain_info.get('csRankingPoints', 'Not found')}"
                     ])
                 embed.add_field(name="\u200b", value="\n".join(guild_info_lines), inline=False)
 
             embed.set_footer(text="DEVELOPED BY THUG")
             await ctx.send(embed=embed)
 
-            # Send images from profile APIs
+            # Send images
             try:
-                # Outfit image
                 outfit_url = f"{self.profile_url}?uid={uid}"
                 async with self.session.get(outfit_url) as img_file:
                     if img_file.status == 200:
                         with io.BytesIO(await img_file.read()) as buf:
                             await ctx.send(file=discord.File(buf, filename=f"profile_{uuid.uuid4().hex[:8]}.png"))
-                    else:
-                        # optional: print status for debugging
-                        print(f"Outfit image HTTP status: {img_file.status}")
 
-                # Profile card image
                 card_url = f"{self.profile_card_url}?uid={uid}"
                 async with self.session.get(card_url) as img_file:
                     if img_file.status == 200:
                         with io.BytesIO(await img_file.read()) as buf:
                             await ctx.send(file=discord.File(buf, filename=f"profile_card_{uuid.uuid4().hex[:8]}.png"))
-                    else:
-                        print(f"Profile card HTTP status: {img_file.status}")
-
             except Exception as e:
                 print("Image sending failed:", e)
 
@@ -273,9 +263,7 @@ class InfoCommands(commands.Cog):
             gc.collect()
 
     async def cog_unload(self):
-        # don't close session here because it's owned by the bot
         pass
 
 async def setup(bot: commands.Bot):
-    # add cog using bot.session (session must be created in main before loading)
     await bot.add_cog(InfoCommands(bot, bot.session))
